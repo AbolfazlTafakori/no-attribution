@@ -1,0 +1,83 @@
+#!/bin/sh
+# no-attribution-hook
+#
+# Strip AI assistant attribution from a commit message.
+#
+# Runs after the message is written and before the commit exists, so a trailer
+# added by a tool default, a template, or habit never reaches the history.
+#
+# It edits rather than rejects. A hook that fails a commit in the middle of
+# someone's work is a worse trade than one that quietly does its job, and there
+# is nothing here a person needs to decide.
+#
+# https://github.com/AbolfazlTafakori/no-attribution
+
+set -u
+
+msg="${1:-}"
+[ -n "$msg" ] && [ -f "$msg" ] || exit 0
+
+tmp="$msg.no-attribution"
+
+# Only the machine-written forms. A sentence in a commit body that happens to
+# mention Claude is the author writing about their work and is left alone; what
+# goes is the trailer and the generated footer.
+grep -v -i \
+  -e '^[[:space:]]*Co-[Aa]uthored-[Bb]y:.*claude' \
+  -e '^[[:space:]]*Co-[Aa]uthored-[Bb]y:.*anthropic' \
+  -e '^[[:space:]]*Co-[Aa]uthored-[Bb]y:.*copilot' \
+  -e '^[[:space:]]*Co-[Aa]uthored-[Bb]y:.*cursor' \
+  -e '^[[:space:]]*Co-[Aa]uthored-[Bb]y:.*aider' \
+  -e '^[[:space:]]*Co-[Aa]uthored-[Bb]y:.*devin' \
+  -e 'Generated with \[Claude Code\]' \
+  -e '^[[:space:]]*🤖 Generated with' \
+  "$msg" > "$tmp" 2>/dev/null
+
+# grep exits 1 when it selects nothing, which for a message that was only a
+# trailer is a correct result and not a failure. What matters is that the file
+# got written.
+[ -f "$tmp" ] || exit 0
+
+# A stripped trailer leaves behind the blank line that separated it, so every
+# message would end ragged. Trailing blank lines go; everything inside the
+# message stays exactly as written.
+awk '{ line[NR] = $0 }
+     END {
+       last = NR
+       while (last > 0 && line[last] ~ /^[[:space:]]*$/) last--
+       for (i = 1; i <= last; i++) print line[i]
+     }' "$tmp" > "$msg"
+
+rm -f "$tmp"
+
+# ── chain to whatever hook was already here ─────────────────────────────────
+#
+# Installed globally through core.hooksPath, this file stands in front of every
+# repository's own .git/hooks, and a project's commit-msg checks — a ticket
+# number rule, commitlint, a DCO sign-off — would silently stop running.
+# Installed per repository, the installer moves any hook it found aside to
+# commit-msg.local and this calls it.
+#
+# Resolved through --git-dir rather than `--git-path hooks/commit-msg`: that one
+# follows core.hooksPath and would point straight back here.
+
+[ -n "${NO_ATTRIBUTION_CHAINED:-}" ] && exit 0
+
+gitdir=$(git rev-parse --git-dir 2>/dev/null) || exit 0
+
+chain=""
+if [ -x "$gitdir/hooks/commit-msg.local" ]; then
+  chain="$gitdir/hooks/commit-msg.local"
+elif [ -x "$gitdir/hooks/commit-msg" ] &&
+     ! grep -q 'no-attribution-hook' "$gitdir/hooks/commit-msg" 2>/dev/null; then
+  # Ours is running from somewhere else, so this one is the repository's.
+  chain="$gitdir/hooks/commit-msg"
+fi
+
+if [ -n "$chain" ]; then
+  NO_ATTRIBUTION_CHAINED=1
+  export NO_ATTRIBUTION_CHAINED
+  exec "$chain" "$@"
+fi
+
+exit 0

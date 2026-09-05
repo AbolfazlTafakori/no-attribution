@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "abolfazltafakori-skills",
+  "description": "Skills by Abolfazl Tafakori.",
+  "owner": {
+    "name": "Abolfazl Tafakori"
+  },
+  "plugins": [
+    {
+      "name": "no-attribution",
+      "source": "./plugins/no-attribution",
+      "description": "Keep AI assistant attribution out of your git history. Strips Co-Authored-By trailers naming Claude, Anthropic and other assistants, and the \"Generated with Claude Code\" footer, with a commit hook that runs before the commit exists.",
+      "category": "productivity",
+      "keywords": ["git", "hooks", "commit", "attribution", "privacy"]
+    }
+  ]
+}

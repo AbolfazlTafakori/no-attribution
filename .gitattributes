@@ -1,0 +1,5 @@
+# The hook and the installer are run by sh, including on Windows through Git
+# Bash. CRLF line endings would make them fail with a confusing error about a
+# command not being found, so they are checked out as-is everywhere.
+*.sh text eol=lf
+plugins/no-attribution/skills/no-attribution/hooks/commit-msg text eol=lf
